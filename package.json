@@ -8,8 +8,8 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
- "dev:css": "tailwindcss -i ./src/style.css -o ./src/output.css --watch",
-  "dev": "npm-run-all -p dev:css start",
+    "dev:css": "tailwindcss -i ./src/style.css -o ./src/output.css --watch",
+    "dev": "npm-run-all -p dev:css start",
     "dist": "electron-builder"
   },
   "engines": {
@@ -35,7 +35,11 @@
       "output": "dist"
     },
     "files": [
-      "**/*"
+      "src/**/*",
+      "main.js",
+      "preload.js",
+      "package.json",
+      "node_modules/**/*"
     ],
     "icon": "build/icons/icon.png",
     "linux": {
@@ -47,7 +51,8 @@
       "maintainer": "bernardo"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icons/icon.ico"
     }
   }
 }

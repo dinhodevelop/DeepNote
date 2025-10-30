@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, Menu  } = require("electron");
 const path = require("path");
+
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -8,11 +9,26 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false, // Permite que o preload script acesse módulos Node.js
+      nodeIntegrationInSubFrames: false
     }
   });
 
+  // Log de erros para debug se necessário
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load:', errorCode, errorDescription);
+  });
+
+  win.webContents.on('crashed', () => {
+    console.error('Renderer process crashed');
+  });
+
   win.loadFile("./src/index.html");
+
+  // Remove menu padrão
+Menu.setApplicationMenu(null);
+
 }
 
 app.whenReady().then(() => {
