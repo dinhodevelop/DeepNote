@@ -36,3 +36,415 @@
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
 }
+
+/* Task Management Styles */
+.task-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.task-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .task-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.timer-btn, .status-btn, .task-action-btn {
+  transition: all 0.15s ease-in-out;
+}
+
+.timer-btn:hover, .status-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .timer-btn:hover, .dark .status-btn:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Progress bar animation */
+.progress-bar {
+  transition: width 0.3s ease-in-out;
+}
+
+/* Modal backdrop blur */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+}
+
+/* Task status indicators */
+.status-indicator {
+  position: relative;
+}
+
+.status-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Smooth scrolling for task grid */
+.tasks-grid {
+  scroll-behavior: smooth;
+}
+
+/* ===== RESPONSIVE DESIGN IMPROVEMENTS ===== */
+
+/* Mobile-first approach for task cards */
+@media (max-width: 768px) {
+  /* Task grid adjustments for mobile */
+  .tasks-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+
+  /* Task card mobile optimizations */
+  .task-card {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Smaller buttons on mobile */
+  .timer-btn, .status-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  /* Stack timer controls vertically on very small screens */
+  .timer-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Adjust task form for mobile */
+  .task-form {
+    padding: 1rem;
+    margin: 0.5rem;
+  }
+
+  /* Make modals full-width on mobile */
+  .modal-content {
+    margin: 1rem;
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Sidebar adjustments */
+  .sidebar {
+    width: 100% !important;
+    position: fixed;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Main content adjustments when sidebar is hidden */
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Note editor mobile optimizations */
+  .note-editor {
+    padding: 0.75rem;
+  }
+
+  /* Note field mobile adjustments */
+  #note-content {
+    min-height: 250px; /* Smaller on mobile */
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Toggle button mobile adjustments */
+  #toggle-note-content {
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  /* Collapsed bar mobile */
+  #note-content-collapsed {
+    padding: 0.75rem;
+  }
+
+  /* Smaller text inputs on mobile */
+  input[type="text"], input[type="number"], textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tasks-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .sidebar {
+    width: 250px;
+  }
+
+  .main-content {
+    margin-left: 250px;
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1025px) {
+  .tasks-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+  }
+
+  .sidebar {
+    width: 280px;
+  }
+
+  .main-content {
+    margin-left: 280px;
+  }
+}
+
+/* Window resize handling */
+.resizable-panel {
+  transition: width 0.2s ease-in-out, height 0.2s ease-in-out;
+}
+
+/* Collapsible sections */
+.collapsible-section {
+  transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.collapsible-section.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.collapsible-section.expanded {
+  max-height: 2000px; /* Large enough to accommodate content */
+  opacity: 1;
+}
+
+/* Note field specific styles */
+#note-content {
+  min-height: 400px;
+  transition: all 0.3s ease-in-out;
+}
+
+#note-content-collapsed {
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+#note-content-collapsed:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark #note-content-collapsed:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Toggle button positioning */
+#toggle-note-content {
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+#toggle-note-content:hover {
+  transform: scale(1.05);
+}
+
+/* Toggle button styles */
+.toggle-btn {
+  transition: transform 0.2s ease-in-out;
+}
+
+.toggle-btn.rotated {
+  transform: rotate(180deg);
+}
+
+/* Responsive text sizes */
+@media (max-width: 640px) {
+  .task-title {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .task-description {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .time-display {
+    font-size: 0.75rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .sidebar, .task-controls, .timer-controls {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .task-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
+
+/* Custom scrollbar for task details modal */
+.task-details-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-details-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.task-details-scroll::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.dark .task-details-scroll::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.5);
+}
+
+/* Pulse animation for active timer */
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-green {
+  animation: pulse-green 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Task card expansion animation */
+.expanded-content {
+  animation: expand 0.3s ease-out;
+  overflow: hidden;
+}
+
+@keyframes expand {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+/* Drag and drop styles */
+.drag-over {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  border: 2px dashed #3b82f6 !important;
+  transform: scale(1.02);
+}
+
+.dragging {
+  opacity: 0.5;
+  transform: rotate(5deg);
+  z-index: 1000;
+}
+
+/* Task form validation styles */
+.validation-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+/* Improved button hover effects */
+.timer-btn:active, .status-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+/* Loading state for buttons */
+.btn-loading {
+  position: relative;
+  color: transparent !important;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Enhanced notification styles */
+.notification-enter {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.notification-exit {
+  animation: slideOutRight 0.3s ease-in;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}

@@ -237,6 +237,11 @@ function loadNote(noteId) {
     showEditor();
     renderNotes();
     updateSaveStatus(isAutoSaveEnabled ? 'auto' : 'manual');
+
+    // Initialize tasks for this note
+    if (window.taskManager) {
+      window.taskManager.initializeTasksForNote(noteId);
+    }
   }
 }
 
@@ -249,6 +254,12 @@ function createNewNote() {
   showEditor();
   noteTitle.focus();
   updateSaveStatus('draft');
+
+  // Clear tasks section when creating new note
+  const tasksSection = document.querySelector("#note-tasks-section");
+  if (tasksSection) {
+    tasksSection.remove();
+  }
 }
 
 function saveNote(isAutoSave = false) {
@@ -359,6 +370,11 @@ function deleteNote() {
   }
 
   if (currentNoteId && confirm("Tem certeza que deseja deletar esta nota?")) {
+    // Clean up any active timers for tasks in this note
+    if (window.taskManager) {
+      window.taskManager.cleanupNoteTimers(currentNoteId);
+    }
+
     window.storageAPI.deleteNote(currentNoteId);
     clearEditor();
     renderNotes();
@@ -376,12 +392,43 @@ function showEditor() {
   noteHeader.classList.remove("hidden");
   noteContent.classList.remove("hidden");
   welcomeMessage.classList.add("hidden");
+
+  // Show the collapse button when editor is visible
+  const toggleBtn = document.querySelector('#toggle-note-content');
+  if (toggleBtn) {
+    toggleBtn.classList.remove("hidden");
+  }
+
+  // Hide task management if active
+  const taskManagement = document.querySelector("#task-management");
+  if (taskManagement) {
+    taskManagement.classList.add("hidden");
+  }
+
+  // Update task manager state
+  if (window.taskManager) {
+    window.taskManager.isTaskViewActive = false;
+  }
 }
 
 function hideEditor() {
   noteHeader.classList.add("hidden");
   noteContent.classList.add("hidden");
   welcomeMessage.classList.remove("hidden");
+
+  // Hide the collapse button and collapsed bar when editor is hidden
+  const toggleBtn = document.querySelector('#toggle-note-content');
+  const collapsedBar = document.querySelector('#note-content-collapsed');
+  if (toggleBtn) toggleBtn.classList.add("hidden");
+  if (collapsedBar) collapsedBar.style.display = 'none';
+
+  // Reset collapse state
+  isNoteFieldCollapsed = false;
+
+  // Also hide task management if active
+  if (window.taskManager && window.taskManager.isTaskViewActive) {
+    window.taskManager.hideTaskView();
+  }
 }
 
 function updateTimer() {
@@ -642,6 +689,61 @@ function autoSave() {
 noteContent.addEventListener("input", autoSave);
 noteTitle.addEventListener("input", autoSave);
 
+// ===== FUNCIONALIDADE DE EXPANSÃO/COLAPSO DO CAMPO DA NOTA =====
+
+let isNoteFieldCollapsed = false;
+
+function collapseNoteField() {
+  const textarea = document.querySelector('#note-content');
+  const toggleBtn = document.querySelector('#toggle-note-content');
+  const collapsedBar = document.querySelector('#note-content-collapsed');
+
+  if (!textarea || !toggleBtn || !collapsedBar) return;
+
+  // Esconder textarea e botão de colapsar
+  textarea.style.display = 'none';
+  toggleBtn.style.display = 'none';
+
+  // Mostrar barra colapsada
+  collapsedBar.style.display = 'flex';
+
+  isNoteFieldCollapsed = true;
+}
+
+function expandNoteField() {
+  const textarea = document.querySelector('#note-content');
+  const toggleBtn = document.querySelector('#toggle-note-content');
+  const collapsedBar = document.querySelector('#note-content-collapsed');
+
+  if (!textarea || !toggleBtn || !collapsedBar) return;
+
+  // Mostrar textarea e botão de colapsar
+  textarea.style.display = 'block';
+  toggleBtn.style.display = 'block';
+
+  // Esconder barra colapsada
+  collapsedBar.style.display = 'none';
+
+  // Focar no textarea
+  textarea.focus();
+
+  isNoteFieldCollapsed = false;
+}
+
+// Event listeners para os botões de toggle do campo da nota
+document.addEventListener('DOMContentLoaded', () => {
+  const toggleNoteBtn = document.querySelector('#toggle-note-content');
+  const expandNoteBtn = document.querySelector('#expand-note-content');
+
+  if (toggleNoteBtn) {
+    toggleNoteBtn.onclick = collapseNoteField;
+  }
+
+  if (expandNoteBtn) {
+    expandNoteBtn.onclick = expandNoteField;
+  }
+});
+
 // Event listeners para o menu de opções
 document.addEventListener('click', (e) => {
   if (!noteOptionsBtn.contains(e.target) && !noteOptionsMenu.contains(e.target)) {
@@ -709,3 +811,13 @@ function initApp() {
 
 // Inicializar quando a página carregar
 initApp();
+
+// Make taskManager globally available for integration
+window.addEventListener('DOMContentLoaded', () => {
+  // Wait for taskManager to be initialized
+  setTimeout(() => {
+    if (window.taskManager) {
+      console.log('Task Manager initialized and integrated with DeepNote');
+    }
+  }, 100);
+});

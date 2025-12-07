@@ -62,6 +62,9 @@
                 </button>
             </div>
 
+
+
+            <!-- Notes Section -->
             <div class="space-y-2">
                 <div class="text-xs text-gray-500 dark:text-zinc-500 uppercase font-semibold tracking-wide notes-section-title">Suas Notas</div>
                 <div id="notes-list" class="space-y-1"></div>
@@ -153,6 +156,8 @@
                 </div>
             </div>
 
+
+
             <!-- Mensagem de Boas-vindas -->
             <div id="welcome-message" class="flex-1 flex items-center justify-center text-gray-500 dark:text-zinc-500">
                 <div class="text-center max-w-md">
@@ -162,15 +167,124 @@
                         </svg>
                     </div>
                     <h2 class="text-2xl font-semibold text-gray-900 dark:text-zinc-100 mb-2">Bem-vindo ao DeepNote</h2>
-                    <p class="text-gray-600 dark:text-zinc-400">Clique em "Nova Nota" para começar a escrever suas ideias</p>
+                    <p class="text-gray-600 dark:text-zinc-400">Clique em "Nova Nota" para começar a escrever suas ideias. Cada nota pode ter suas próprias tarefas com controle de tempo!</p>
                 </div>
             </div>
 
-            <!-- Editor de Conteúdo -->
-            <textarea id="note-content" class="flex-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-4 outline-none text-lg resize-none hidden focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500"
-                placeholder="Escreva sua nota aqui..."></textarea>
+            <!-- Container do Editor de Conteúdo -->
+            <div class="flex-1 flex flex-col">
+                <div class="relative flex-1 flex flex-col">
+                    <!-- Textarea com altura maior -->
+                    <textarea id="note-content" class="flex-1 min-h-[400px] bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-4 pr-12 outline-none text-lg resize-none hidden focus:border-blue-500 dark:focus:border-blue-400 focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500"
+                        placeholder="Escreva sua nota aqui..."></textarea>
+
+                    <!-- Botão de Colapsar/Expandir dentro do campo -->
+                    <button id="toggle-note-content" class="absolute top-2 right-2 p-2 rounded-lg bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors shadow-sm border border-gray-200 dark:border-zinc-600 hidden" title="Colapsar campo de texto">
+                        <svg id="note-toggle-icon" class="w-4 h-4 text-gray-600 dark:text-zinc-300 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Barra colapsada (quando o campo está minimizado) -->
+                    <div id="note-content-collapsed" class="hidden bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 flex items-center justify-between">
+                        <span class="text-gray-500 dark:text-zinc-400 text-sm">Nota</span>
+                        <button id="expand-note-content" class="p-1.5 rounded-lg bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 transition-colors" title="Expandir campo de texto">
+                            <svg class="w-4 h-4 text-gray-600 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
+
+    <!-- Modal para Adicionar Tempo Manual -->
+    <div id="manual-time-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-6 w-96 max-w-md mx-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-zinc-100 mb-4">Adicionar Tempo Manual</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">Tempo trabalhado:</label>
+                    <div class="flex items-center gap-2">
+                        <input id="manual-hours" type="number" min="0" max="23" value="0" class="w-20 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded text-center bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100">
+                        <span class="text-sm text-gray-500 dark:text-zinc-400">h</span>
+                        <input id="manual-minutes" type="number" min="0" max="59" value="30" class="w-20 px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded text-center bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100">
+                        <span class="text-sm text-gray-500 dark:text-zinc-400">min</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">Descrição (opcional):</label>
+                    <input id="manual-time-description" type="text" placeholder="Ex: Reunião, pesquisa, desenvolvimento..." class="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 placeholder-gray-400 dark:placeholder-zinc-500">
+                </div>
+                <div class="flex items-center gap-2 pt-4">
+                    <button id="save-manual-time-btn" class="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 transition px-4 py-2 rounded text-white font-medium">
+                        Adicionar Tempo
+                    </button>
+                    <button id="cancel-manual-time-btn" class="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 transition px-4 py-2 rounded text-white font-medium">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes da Tarefa -->
+    <div id="task-details-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-6 w-[500px] max-w-md mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-zinc-100">Detalhes da Tarefa</h3>
+                <button id="close-task-details" class="text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="task-details-content" class="space-y-4">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Ajuda -->
+    <div id="help-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-zinc-800 rounded-lg p-6 w-[400px] max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-zinc-100">Atalhos de Teclado</h3>
+                <button id="close-help-modal" class="text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-700">
+                    <span class="text-gray-600 dark:text-zinc-400">Nova tarefa</span>
+                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-zinc-700 rounded text-xs font-mono">Ctrl + N</kbd>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-700">
+                    <span class="text-gray-600 dark:text-zinc-400">Ver tarefas</span>
+                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-zinc-700 rounded text-xs font-mono">Ctrl + T</kbd>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-700">
+                    <span class="text-gray-600 dark:text-zinc-400">Salvar tarefa</span>
+                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-zinc-700 rounded text-xs font-mono">Enter</kbd>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-700">
+                    <span class="text-gray-600 dark:text-zinc-400">Cancelar/Fechar</span>
+                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-zinc-700 rounded text-xs font-mono">Esc</kbd>
+                </div>
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p class="text-blue-700 dark:text-blue-300 text-xs">
+                        💡 <strong>Dica:</strong> Os timers são automaticamente salvos e restaurados entre sessões.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script src="./icons.js"></script>
+<script src="./task-manager.js"></script>
 <script src="./renderer.js"></script>
 
 </body>

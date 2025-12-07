@@ -1,17 +1,31 @@
 const { app, BrowserWindow, ipcMain, Menu  } = require("electron");
 const path = require("path");
 
+// Configurações para resolver problemas do GLib no Linux
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('--disable-gpu-sandbox');
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+  app.commandLine.appendSwitch('--disable-background-timer-throttling');
+  app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('--disable-features', 'TranslateUI');
+  app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+}
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1000,
     height: 700,
+    show: false, // Não mostrar até estar pronto
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // Permite que o preload script acesse módulos Node.js
-      nodeIntegrationInSubFrames: false
+      nodeIntegrationInSubFrames: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false
     }
   });
 
@@ -26,8 +40,13 @@ function createWindow() {
 
   win.loadFile("./src/index.html");
 
+  // Mostrar janela apenas quando estiver pronta
+  win.once('ready-to-show', () => {
+    win.show();
+  });
+
   // Remove menu padrão
-Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(null);
 
 }
 

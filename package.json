@@ -8,8 +8,10 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "start:clean": "ELECTRON_DISABLE_SECURITY_WARNINGS=true ELECTRON_ENABLE_LOGGING=false electron .",
     "dev:css": "tailwindcss -i ./src/style.css -o ./src/output.css --watch",
-    "dev": "npm-run-all -p dev:css start",
+    "dev": "npm-run-all -p dev:css start:clean",
+    "dev:verbose": "npm-run-all -p dev:css start",
     "dist": "electron-builder"
   },
   "engines": {
@@ -26,6 +28,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.16",
     "electron-store": "^11.0.2",
+    "lucide": "^0.553.0",
     "uuid": "^13.0.0"
   },
   "build": {

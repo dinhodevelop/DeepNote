@@ -60,11 +60,30 @@ contextBridge.exposeInMainWorld("storageAPI", {
       writeData(data);
     }
   },
+
+  // Initialize note with tasks array if it doesn't exist
+  initializeNoteTasks: (noteId) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note && !note.tasks) {
+      note.tasks = [];
+      writeData(data);
+    }
+  },
   deleteNote: (id) => {
     const data = readData();
     const noteIndex = data.notes.findIndex(n => n.id === id);
     if (noteIndex !== -1) {
       const note = data.notes[noteIndex];
+
+      // Clear any active timers for tasks in this note
+      if (note.tasks && note.tasks.length > 0) {
+        // Notify TaskManager to clean up timers for this note
+        if (typeof window !== 'undefined' && window.taskManager) {
+          window.taskManager.cleanupNoteTimers(id);
+        }
+      }
+
       note.deletedAt = Date.now();
       data.trash.push(note);
       data.notes.splice(noteIndex, 1);
@@ -91,5 +110,81 @@ contextBridge.exposeInMainWorld("storageAPI", {
     const data = readData();
     data.trash = [];
     writeData(data);
+  },
+
+  // Task Management Functions (within notes)
+  getNoteTasks: (noteId) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    return note?.tasks || [];
+  },
+
+  saveNoteTask: (noteId, task) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note) {
+      if (!note.tasks) note.tasks = [];
+      note.tasks.push(task);
+      writeData(data);
+    }
+  },
+
+  updateNoteTask: (noteId, taskId, updatedTask) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note && note.tasks) {
+      const taskIndex = note.tasks.findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        note.tasks[taskIndex] = { ...note.tasks[taskIndex], ...updatedTask };
+        writeData(data);
+      }
+    }
+  },
+
+  deleteNoteTask: (noteId, taskId) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note && note.tasks) {
+      note.tasks = note.tasks.filter(t => t.id !== taskId);
+      writeData(data);
+    }
+  },
+
+  // Timer state persistence for tasks within notes
+  updateNoteTaskTimer: (noteId, taskId, timerData) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note && note.tasks) {
+      const task = note.tasks.find(t => t.id === taskId);
+      if (task) {
+        task.timer = { ...task.timer, ...timerData };
+        writeData(data);
+      }
+    }
+  },
+
+  // Add manual time to task within note
+  addNoteTaskManualTime: (noteId, taskId, timeEntry) => {
+    const data = readData();
+    const note = data.notes.find(n => n.id === noteId);
+    if (note && note.tasks) {
+      const task = note.tasks.find(t => t.id === taskId);
+      if (task) {
+        if (!task.manualTimeEntries) {
+          task.manualTimeEntries = [];
+        }
+        task.manualTimeEntries.push(timeEntry);
+
+        // Update total worked time
+        const totalManualTime = task.manualTimeEntries.reduce((sum, entry) => sum + entry.minutes, 0);
+        const timerWorkedTime = task.timer?.workedTime || 0;
+        task.timer = {
+          ...task.timer,
+          totalWorkedTime: timerWorkedTime + (totalManualTime * 60) // Convert to seconds
+        };
+
+        writeData(data);
+      }
+    }
   }
 });
