@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, Menu  } = require("electron");
 const path = require("path");
 
-// Configurações para resolver problemas do GLib no Linux
+// Configurações para resolver problemas do GLib no Linux (especialmente Arch Linux)
 if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('--no-sandbox');
+  app.commandLine.appendSwitch('--disable-dev-shm-usage');
   app.commandLine.appendSwitch('--disable-gpu-sandbox');
   app.commandLine.appendSwitch('--disable-software-rasterizer');
   app.commandLine.appendSwitch('--disable-background-timer-throttling');
@@ -10,13 +12,28 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('--disable-renderer-backgrounding');
   app.commandLine.appendSwitch('--disable-features', 'TranslateUI');
   app.commandLine.appendSwitch('--disable-ipc-flooding-protection');
+  app.commandLine.appendSwitch('--disable-extensions');
+  app.commandLine.appendSwitch('--disable-default-apps');
+  app.commandLine.appendSwitch('--disable-web-security');
+  app.commandLine.appendSwitch('--disable-features=VizDisplayCompositor');
+  app.commandLine.appendSwitch('--disable-gpu-compositing');
+  app.commandLine.appendSwitch('--disable-accelerated-2d-canvas');
+  app.commandLine.appendSwitch('--disable-accelerated-jpeg-decoding');
+  app.commandLine.appendSwitch('--disable-accelerated-mjpeg-decode');
+  app.commandLine.appendSwitch('--disable-accelerated-video-decode');
 }
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    width: 1200,
+    height: 800,
+    minWidth: 800,
+    minHeight: 600,
     show: false, // Não mostrar até estar pronto
+    resizable: true,
+    maximizable: true,
+    fullscreenable: true,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

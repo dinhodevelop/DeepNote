@@ -9,8 +9,10 @@
   "scripts": {
     "start": "electron .",
     "start:clean": "ELECTRON_DISABLE_SECURITY_WARNINGS=true ELECTRON_ENABLE_LOGGING=false electron .",
+    "start:stable": "./start-stable.sh",
     "dev:css": "tailwindcss -i ./src/style.css -o ./src/output.css --watch",
     "dev": "npm-run-all -p dev:css start:clean",
+    "dev:stable": "npm-run-all -p dev:css start:stable",
     "dev:verbose": "npm-run-all -p dev:css start",
     "dist": "electron-builder"
   },

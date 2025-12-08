@@ -3,10 +3,11 @@
 
 class TaskManager {
   constructor() {
+
+    this.activeTimers = new Map(); // Store active timers for each task
     this.currentNoteId = null;
     this.currentTaskId = null;
     this.editingTaskId = null;
-    this.activeTimers = new Map(); // Store active timers for each task
     this.draggedTask = null;
 
     // Initialize after DOM is ready
@@ -64,32 +65,41 @@ class TaskManager {
     window.addEventListener('beforeunload', () => this.persistTimerStates());
   }
 
+
   // Initialize tasks section within a note
-  initializeTasksForNote(noteId) {
+  async initializeTasksForNote(noteId) {
     this.currentNoteId = noteId;
-    window.storageAPI.initializeNoteTasks(noteId);
-    this.renderTasksSection();
+    try {
+      await window.storageAPI.initializeNoteTasks(noteId);
+      this.renderTasksSection();
+    } catch (error) {
+      console.error('Error initializing tasks for note:', error);
+    }
   }
 
   // Clean up timers when a note is deleted
-  cleanupNoteTimers(noteId) {
-    // Get all tasks for this note
-    const tasks = window.storageAPI.getNoteTasks(noteId);
+  async cleanupNoteTimers(noteId) {
+    try {
+      // Get all tasks for this note
+      const tasks = await window.storageAPI.getNoteTasks(noteId);
 
-    // Clear any active timers for tasks in this note
-    tasks.forEach(task => {
-      if (this.activeTimers.has(task.id)) {
-        clearInterval(this.activeTimers.get(task.id));
-        this.activeTimers.delete(task.id);
+      // Clear any active timers for tasks in this note
+      tasks.forEach(task => {
+        if (this.activeTimers.has(task.id)) {
+          clearInterval(this.activeTimers.get(task.id));
+          this.activeTimers.delete(task.id);
+        }
+      });
+
+      // If this is the current note being viewed, clear the current note ID
+      if (this.currentNoteId === noteId) {
+        this.currentNoteId = null;
       }
-    });
 
-    // If this is the current note being viewed, clear the current note ID
-    if (this.currentNoteId === noteId) {
-      this.currentNoteId = null;
+      console.log(`Cleaned up timers for deleted note: ${noteId}`);
+    } catch (error) {
+      console.error('Error cleaning up note timers:', error);
     }
-
-    console.log(`Cleaned up timers for deleted note: ${noteId}`);
   }
 
   // Toggle tasks section visibility
@@ -120,14 +130,25 @@ class TaskManager {
   renderTasksSection() {
     if (!this.currentNoteId) return;
 
+    // Try new editor first, then fallback to legacy
+    let targetContainer = document.querySelector("#tasks-container");
     const noteContent = document.querySelector("#note-content");
-    if (!noteContent) return;
+
+    if (!targetContainer && !noteContent) return;
 
     // Check if tasks section already exists
     let tasksSection = document.querySelector("#note-tasks-section");
     if (!tasksSection) {
       tasksSection = this.createTasksSection();
-      noteContent.parentNode.insertBefore(tasksSection, noteContent.nextSibling);
+
+      if (targetContainer) {
+        // New editor - append to tasks container
+        targetContainer.appendChild(tasksSection);
+        targetContainer.classList.remove('hidden');
+      } else if (noteContent) {
+        // Legacy editor - insert after note content
+        noteContent.parentNode.insertBefore(tasksSection, noteContent.nextSibling);
+      }
     }
 
     this.loadNoteTasks();
@@ -244,7 +265,7 @@ class TaskManager {
     // Save task button
     const saveTaskBtn = section.querySelector('#save-note-task-btn');
     if (saveTaskBtn) {
-      saveTaskBtn.onclick = () => this.saveTask();
+      saveTaskBtn.onclick = async () => await this.saveTask();
     }
 
     // Cancel task button
@@ -260,9 +281,9 @@ class TaskManager {
 
     if (titleInput) {
       titleInput.addEventListener('input', () => this.validateTaskForm());
-      titleInput.addEventListener('keydown', (e) => {
+      titleInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter' && this.isTaskFormValid()) {
-          this.saveTask();
+          await this.saveTask();
         }
       });
     }
@@ -289,13 +310,13 @@ class TaskManager {
         }
       });
 
-      column.addEventListener('drop', (e) => {
+      column.addEventListener('drop', async (e) => {
         e.preventDefault();
         column.classList.remove('bg-opacity-75', 'border-2', 'border-dashed', 'border-blue-400');
 
         if (this.draggedTask) {
           const newStatus = column.dataset.status;
-          this.updateTaskStatus(this.draggedTask.id, newStatus);
+          await this.updateTaskStatus(this.draggedTask.id, newStatus);
           this.draggedTask = null;
         }
       });
@@ -306,96 +327,106 @@ class TaskManager {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
   }
 
-  resetTimer(taskId) {
+  async resetTimer(taskId) {
     if (!this.currentNoteId) return;
 
     if (!confirm('Tem certeza que deseja resetar o timer desta tarefa? Todo o tempo registrado será perdido.')) {
       return;
     }
 
-    // Clear local timer
-    if (this.activeTimers.has(taskId)) {
-      clearInterval(this.activeTimers.get(taskId));
-      this.activeTimers.delete(taskId);
-    }
-
-    const timerData = {
-      isRunning: false,
-      currentSessionStart: null,
-      workedTime: 0,
-      totalWorkedTime: 0,
-      pausedTime: 0,
-      lastUpdate: Date.now()
-    };
-
-    window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
-
-    // Also clear manual time entries
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      window.storageAPI.updateNoteTask(this.currentNoteId, taskId, { ...task, manualTimeEntries: [] });
-    }
-
-    this.loadNoteTasks();
-    this.showNotification('Timer resetado!');
-  }
-
-  updateTimerDisplay(taskId) {
-    if (!this.currentNoteId) return;
-
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (!task || !task.timer?.isRunning) {
+    try {
+      // Clear local timer
       if (this.activeTimers.has(taskId)) {
         clearInterval(this.activeTimers.get(taskId));
         this.activeTimers.delete(taskId);
       }
-      return;
-    }
 
-    // Update the display in real-time
-    const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
-    if (taskCard) {
-      const currentSessionTime = Math.floor((Date.now() - task.timer.currentSessionStart) / 1000);
-      const totalCurrentTime = (task.timer.workedTime || 0) + currentSessionTime;
+      const timerData = {
+        isRunning: false,
+        currentSessionStart: null,
+        workedTime: 0,
+        totalWorkedTime: 0,
+        pausedTime: 0,
+        lastUpdate: Date.now()
+      };
 
-      // Update progress bar and time display
-      const progressBar = taskCard.querySelector('.bg-blue-500');
-      const timeDisplay = taskCard.querySelector('.flex.items-center.gap-2 span');
+      await window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
 
-      if (progressBar && timeDisplay) {
-        const estimatedTime = task.estimatedTime || 0;
-        const progress = estimatedTime > 0 ? Math.min((totalCurrentTime / estimatedTime) * 100, 100) : 0;
-        progressBar.style.width = `${progress}%`;
-        timeDisplay.textContent = `${this.formatTime(totalCurrentTime)} / ${this.formatTime(estimatedTime)}`;
+      // Also clear manual time entries
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        await window.storageAPI.updateNoteTask(this.currentNoteId, taskId, { ...task, manualTimeEntries: [] });
       }
+
+      await this.loadNoteTasks();
+      this.showNotification('Timer resetado!');
+    } catch (error) {
+      console.error('Error resetting timer:', error);
+      this.showNotification('Erro ao resetar timer', 'error');
     }
   }
 
-  updateTaskStatus(taskId, newStatus) {
+  // updateTimerDisplay(taskId) {
+  //   if (!this.currentNoteId) return;
+
+  //   const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
+  //   const task = tasks.find(t => t.id === taskId);
+  //   if (!task || !task.timer?.isRunning) {
+  //     if (this.activeTimers.has(taskId)) {
+  //       clearInterval(this.activeTimers.get(taskId));
+  //       this.activeTimers.delete(taskId);
+  //     }
+  //     return;
+  //   }
+
+  //   // Update the display in real-time
+  //   const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+  //   if (taskCard) {
+  //     const currentSessionTime = Math.floor((Date.now() - task.timer.currentSessionStart) / 1000);
+  //     const totalCurrentTime = (task.timer.workedTime || 0) + currentSessionTime;
+
+  //     // Update progress bar and time display
+  //     const progressBar = taskCard.querySelector('.bg-blue-500');
+  //     const timeDisplay = taskCard.querySelector('.flex.items-center.gap-2 span');
+
+  //     if (progressBar && timeDisplay) {
+  //       const estimatedTime = task.estimatedTime || 0;
+  //       const progress = estimatedTime > 0 ? Math.min((totalCurrentTime / estimatedTime) * 100, 100) : 0;
+  //       progressBar.style.width = `${progress}%`;
+  //       timeDisplay.textContent = `${this.formatTime(totalCurrentTime)} / ${this.formatTime(estimatedTime)}`;
+  //     }
+  //   }
+  // }
+
+  async updateTaskStatus(taskId, newStatus) {
     if (!this.currentNoteId) return;
 
-    // If moving to done, pause timer first
-    if (newStatus === 'done') {
-      this.pauseTimer(taskId);
+    try {
+      // If moving to done, pause timer first
+      if (newStatus === 'done') {
+        await this.pauseTimer(taskId);
+      }
+
+      const updateData = {
+        status: newStatus,
+        updated: Date.now()
+      };
+
+      await window.storageAPI.updateNoteTask(this.currentNoteId, taskId, updateData);
+      await this.loadNoteTasks();
+
+      const statusMessages = {
+        'backlog': 'Tarefa movida para Backlog',
+        'progress': 'Tarefa em progresso',
+        'done': 'Tarefa concluída! 🎉'
+      };
+
+      this.showNotification(statusMessages[newStatus] || 'Status atualizado');
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      this.showNotification('Erro ao atualizar status da tarefa', 'error');
     }
-
-    const updateData = {
-      status: newStatus,
-      updated: Date.now()
-    };
-
-    window.storageAPI.updateNoteTask(this.currentNoteId, taskId, updateData);
-    this.loadNoteTasks();
-
-    const statusMessages = {
-      'backlog': 'Tarefa movida para Backlog',
-      'progress': 'Tarefa em progresso',
-      'done': 'Tarefa concluída! 🎉'
-    };
-
-    this.showNotification(statusMessages[newStatus] || 'Status atualizado');
   }
 
   showManualTimeModal(taskId) {
@@ -514,7 +545,7 @@ class TaskManager {
     return title.length > 0 && (hours > 0 || minutes > 0);
   }
 
-  saveTask() {
+  async saveTask() {
     if (!this.currentNoteId || !this.isTaskFormValid()) return;
 
     const titleInput = document.querySelector('#note-task-title');
@@ -531,7 +562,7 @@ class TaskManager {
     try {
       if (this.editingTaskId) {
         // EDITING: Preserve existing data, update only specific fields
-        const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
+        const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
         const existingTask = tasks.find(t => t.id === this.editingTaskId);
 
         if (!existingTask) {
@@ -548,7 +579,7 @@ class TaskManager {
           updated: Date.now() // Update timestamp
         };
 
-        window.storageAPI.updateNoteTask(this.currentNoteId, this.editingTaskId, updatedTask);
+        await window.storageAPI.updateNoteTask(this.currentNoteId, this.editingTaskId, updatedTask);
         this.showNotification('Tarefa atualizada com sucesso!');
       } else {
         // CREATING: Create new task with default values
@@ -571,12 +602,12 @@ class TaskManager {
           manualTimeEntries: []
         };
 
-        window.storageAPI.saveNoteTask(this.currentNoteId, newTask);
+        await window.storageAPI.saveNoteTask(this.currentNoteId, newTask);
         this.showNotification('Tarefa criada com sucesso!');
       }
 
       this.hideTaskForm();
-      this.loadNoteTasks();
+      await this.loadNoteTasks();
     } catch (error) {
       console.error('Error saving task:', error);
       this.showNotification('Erro ao salvar tarefa', 'error');
@@ -602,11 +633,16 @@ class TaskManager {
     return `${minutes}m`;
   }
 
-  loadNoteTasks() {
+  async loadNoteTasks() {
     if (!this.currentNoteId) return;
 
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    this.renderTasksGrid(tasks);
+    try {
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      this.renderTasksGrid(tasks);
+    } catch (error) {
+      console.error('Error loading note tasks:', error);
+      this.showNotification('Erro ao carregar tarefas', 'error');
+    }
   }
 
   renderTasksGrid(tasks) {
@@ -640,14 +676,14 @@ class TaskManager {
     // Render tasks in each column
     Object.entries(tasksByStatus).forEach(([status, statusTasks]) => {
       const container = status === 'backlog' ? backlogTasks :
-                      status === 'progress' ? progressTasks : doneTasks;
+        status === 'progress' ? progressTasks : doneTasks;
 
       if (statusTasks.length === 0) {
         const emptyDiv = document.createElement('div');
         emptyDiv.className = 'text-gray-400 dark:text-zinc-500 text-xs text-center py-4 border border-dashed border-gray-200 dark:border-zinc-700 rounded';
         emptyDiv.textContent = status === 'backlog' ? 'Nenhuma tarefa' :
-                              status === 'progress' ? 'Nada em andamento' :
-                              'Nada concluído';
+          status === 'progress' ? 'Nada em andamento' :
+            'Nada concluído';
         container.appendChild(emptyDiv);
         return;
       }
@@ -809,7 +845,7 @@ class TaskManager {
     });
 
     // Add click event listeners for all action buttons
-    card.addEventListener('click', (e) => {
+    card.addEventListener('click', async (e) => {
       const button = e.target.closest('button[data-action]');
       if (!button) return;
 
@@ -819,186 +855,249 @@ class TaskManager {
       const action = button.dataset.action;
       const taskId = button.dataset.taskId;
 
-      switch (action) {
-        case 'toggle-timer':
-          this.toggleTimer(taskId);
-          break;
-        case 'edit-task':
-          this.editTask(taskId);
-          break;
-        case 'delete-task':
-          this.deleteTask(taskId);
-          break;
-        case 'toggle-expansion':
-          this.toggleTaskExpansion(taskId);
-          break;
-        case 'reset-timer':
-          this.resetTimer(taskId);
-          break;
-        case 'manual-time':
-          this.showManualTimeModal(taskId);
-          break;
-        case 'update-status':
-          const newStatus = button.dataset.status;
-          this.updateTaskStatus(taskId, newStatus);
-          break;
-        default:
-          console.warn('Unknown action:', action);
+      try {
+        switch (action) {
+          case 'toggle-timer':
+            await this.toggleTimer(taskId);
+            break;
+          case 'edit-task':
+            await this.editTask(taskId);
+            break;
+          case 'delete-task':
+            await this.deleteTask(taskId);
+            break;
+          case 'toggle-expansion':
+            await this.toggleTaskExpansion(taskId);
+            break;
+          case 'reset-timer':
+            await this.resetTimer(taskId);
+            break;
+          case 'manual-time':
+            this.showManualTimeModal(taskId);
+            break;
+          case 'update-status':
+            const newStatus = button.dataset.status;
+            await this.updateTaskStatus(taskId, newStatus);
+            break;
+          default:
+            console.warn('Unknown action:', action);
+        }
+      } catch (error) {
+        console.error('Error handling task action:', error);
+        this.showNotification('Erro ao executar ação', 'error');
       }
     });
 
     return card;
   }
 
-  toggleTaskExpansion(taskId) {
+  async toggleTaskExpansion(taskId) {
     if (!this.currentNoteId) return;
 
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
+    try {
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
 
-    task.isExpanded = !task.isExpanded;
-    window.storageAPI.updateNoteTask(this.currentNoteId, taskId, { isExpanded: task.isExpanded });
-    this.loadNoteTasks();
+      task.isExpanded = !task.isExpanded;
+      await window.storageAPI.updateNoteTask(this.currentNoteId, taskId, { isExpanded: task.isExpanded });
+      await this.loadNoteTasks();
+    } catch (error) {
+      console.error('Error toggling task expansion:', error);
+      this.showNotification('Erro ao expandir/colapsar tarefa', 'error');
+    }
   }
 
-  editTask(taskId) {
+  async editTask(taskId) {
     if (!this.currentNoteId) return;
 
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
+    try {
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
 
-    this.editingTaskId = taskId;
+      this.editingTaskId = taskId;
 
-    // Populate form with task data
-    const titleInput = document.querySelector('#note-task-title');
-    const descInput = document.querySelector('#note-task-description');
-    const hoursInput = document.querySelector('#note-task-hours');
-    const minutesInput = document.querySelector('#note-task-minutes');
+      // Populate form with task data
+      const titleInput = document.querySelector('#note-task-title');
+      const descInput = document.querySelector('#note-task-description');
+      const hoursInput = document.querySelector('#note-task-hours');
+      const minutesInput = document.querySelector('#note-task-minutes');
 
-    if (titleInput) titleInput.value = task.title;
-    if (descInput) descInput.value = task.description || '';
+      if (titleInput) titleInput.value = task.title;
+      if (descInput) descInput.value = task.description || '';
 
-    const totalMinutes = Math.floor((task.estimatedTime || 0) / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
+      const totalMinutes = Math.floor((task.estimatedTime || 0) / 60);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
 
-    if (hoursInput) hoursInput.value = hours;
-    if (minutesInput) minutesInput.value = minutes;
+      if (hoursInput) hoursInput.value = hours;
+      if (minutesInput) minutesInput.value = minutes;
 
-    this.showTaskForm();
-    this.validateTaskForm();
+      this.showTaskForm();
+      this.validateTaskForm();
+    } catch (error) {
+      console.error('Error editing task:', error);
+      this.showNotification('Erro ao editar tarefa', 'error');
+    }
   }
 
-  deleteTask(taskId) {
+  async deleteTask(taskId) {
     if (!this.currentNoteId) return;
 
     if (!confirm('Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.')) {
       return;
     }
 
-    // Clear timer if running
-    if (this.activeTimers.has(taskId)) {
-      clearInterval(this.activeTimers.get(taskId));
-      this.activeTimers.delete(taskId);
-    }
-
-    window.storageAPI.deleteNoteTask(this.currentNoteId, taskId);
-    this.loadNoteTasks();
-    this.showNotification('Tarefa excluída');
-  }
-
-  toggleTimer(taskId) {
-    if (!this.currentNoteId) return;
-
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    const isCurrentlyRunning = task.timer?.isRunning || false;
-
-    if (isCurrentlyRunning) {
-      this.pauseTimer(taskId);
-    } else {
-      // Pause all other timers first
-      this.pauseAllTimers();
-      this.startTimer(taskId);
-    }
-  }
-
-  startTimer(taskId) {
-    if (!this.currentNoteId) return;
-
-    const now = Date.now();
-
-    // Update task in storage
-    const timerData = {
-      isRunning: true,
-      currentSessionStart: now,
-      lastUpdate: now
-    };
-
-    window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
-
-    // Start local timer
-    const interval = setInterval(() => {
-      this.updateTimerDisplay(taskId);
-    }, 1000);
-
-    this.activeTimers.set(taskId, interval);
-
-    // Auto-move to progress if in backlog
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (task && task.status === 'backlog') {
-      this.updateTaskStatus(taskId, 'progress');
-    }
-
-    this.loadNoteTasks();
-    this.showNotification('Timer iniciado!');
-  }
-
-  pauseTimer(taskId) {
-    if (!this.currentNoteId) return;
-
-    // Clear local timer
-    if (this.activeTimers.has(taskId)) {
-      clearInterval(this.activeTimers.get(taskId));
-      this.activeTimers.delete(taskId);
-    }
-
-    // Calculate worked time for this session
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    const task = tasks.find(t => t.id === taskId);
-    if (!task || !task.timer?.currentSessionStart) return;
-
-    const sessionTime = Math.floor((Date.now() - task.timer.currentSessionStart) / 1000);
-    const newWorkedTime = (task.timer.workedTime || 0) + sessionTime;
-    const newTotalWorkedTime = (task.timer.totalWorkedTime || 0) + sessionTime;
-
-    const timerData = {
-      isRunning: false,
-      currentSessionStart: null,
-      workedTime: newWorkedTime,
-      totalWorkedTime: newTotalWorkedTime,
-      lastUpdate: Date.now()
-    };
-
-    window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
-    this.loadNoteTasks();
-    this.showNotification('Timer pausado!');
-  }
-
-  pauseAllTimers() {
-    if (!this.currentNoteId) return;
-
-    const tasks = window.storageAPI.getNoteTasks(this.currentNoteId);
-    tasks.forEach(task => {
-      if (task.timer?.isRunning) {
-        this.pauseTimer(task.id);
+    try {
+      // Clear timer if running
+      if (this.activeTimers.has(taskId)) {
+        clearInterval(this.activeTimers.get(taskId));
+        this.activeTimers.delete(taskId);
       }
-    });
+
+      await window.storageAPI.deleteNoteTask(this.currentNoteId, taskId);
+      await this.loadNoteTasks();
+      this.showNotification('Tarefa excluída');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      this.showNotification('Erro ao excluir tarefa', 'error');
+    }
+  }
+  async toggleTimer(taskId) {
+    if (!this.currentNoteId) return;
+
+    try {
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const isCurrentlyRunning = task.timer?.isRunning || false;
+
+      if (isCurrentlyRunning) {
+        await this.pauseTimer(taskId);
+      } else {
+        // Pause all other timers first
+        await this.pauseAllTimers();
+        await this.startTimer(taskId);
+      }
+    } catch (error) {
+      console.error('Error toggling timer:', error);
+      this.showNotification('Erro ao alternar timer', 'error');
+    }
+  }
+
+  async startTimer(taskId) {
+    if (!this.currentNoteId) return;
+
+    try {
+      const now = Date.now();
+
+      // Get current task data FIRST
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      // Update task in storage
+      const timerData = {
+        isRunning: true,
+        currentSessionStart: now,
+        lastUpdate: now
+      };
+
+      await window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
+
+      // Start local timer with base time (CRITICAL!)
+      const baseWorkedTime = task.timer?.workedTime || 0;
+      const estimatedTime = task.estimatedTime || 0;
+
+      const interval = setInterval(() => {
+        // Calculate elapsed time in THIS session
+        const elapsedInSession = Math.floor((Date.now() - now) / 1000);
+        // Total time = previous work + current session
+        const totalTime = baseWorkedTime + elapsedInSession;
+
+        // Update UI directly (NO storage calls here!)
+        const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+        if (taskCard) {
+          const timeDisplay = taskCard.querySelector('.flex.items-center.gap-2 span');
+          const progressBar = taskCard.querySelector('.bg-blue-500');
+
+          if (timeDisplay) {
+            timeDisplay.textContent = `${this.formatTime(totalTime)} / ${this.formatTime(estimatedTime)}`;
+          }
+
+          if (progressBar) {
+            const progress = estimatedTime > 0 ? Math.min((totalTime / estimatedTime) * 100, 100) : 0;
+            progressBar.style.width = `${progress}%`;
+          }
+        }
+      }, 1000);
+
+      this.activeTimers.set(taskId, interval);
+
+      // Auto-move to progress if in backlog
+      if (task.status === 'backlog') {
+        await this.updateTaskStatus(taskId, 'progress');
+      } else {
+        await this.loadNoteTasks();
+      }
+
+      this.showNotification('Timer iniciado!');
+    } catch (error) {
+      console.error('Error starting timer:', error);
+      this.showNotification('Erro ao iniciar timer', 'error');
+    }
+  }
+  async pauseTimer(taskId) {
+    if (!this.currentNoteId) return;
+
+    try {
+      // Clear local timer
+      if (this.activeTimers.has(taskId)) {
+        clearInterval(this.activeTimers.get(taskId));
+        this.activeTimers.delete(taskId);
+      }
+
+      // Calculate worked time for this session
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.timer?.currentSessionStart) return;
+
+      const sessionTime = Math.floor((Date.now() - task.timer.currentSessionStart) / 1000);
+      const newWorkedTime = (task.timer.workedTime || 0) + sessionTime;
+      const newTotalWorkedTime = (task.timer.totalWorkedTime || 0) + sessionTime;
+
+      const timerData = {
+        isRunning: false,
+        currentSessionStart: null,
+        workedTime: newWorkedTime,
+        totalWorkedTime: newTotalWorkedTime,
+        lastUpdate: Date.now()
+      };
+
+      await window.storageAPI.updateNoteTaskTimer(this.currentNoteId, taskId, timerData);
+      await this.loadNoteTasks();
+      this.showNotification('Timer pausado!');
+    } catch (error) {
+      console.error('Error pausing timer:', error);
+      this.showNotification('Erro ao pausar timer', 'error');
+    }
+  }
+
+  async pauseAllTimers() {
+    if (!this.currentNoteId) return;
+
+    try {
+      const tasks = await window.storageAPI.getNoteTasks(this.currentNoteId);
+      for (const task of tasks) {
+        if (task.timer?.isRunning) {
+          await this.pauseTimer(task.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error pausing all timers:', error);
+    }
   }
 
 
@@ -1038,28 +1137,28 @@ class TaskManager {
 
 
   // Enhanced time formatting with better precision
-  formatTime(seconds) {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    }
+  // formatTime(seconds) {
+  //   if (seconds < 60) {
+  //     return `${seconds}s`;
+  //   }
 
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
+  //   const hours = Math.floor(seconds / 3600);
+  //   const minutes = Math.floor((seconds % 3600) / 60);
+  //   const remainingSeconds = seconds % 60;
 
-    if (hours > 0) {
-      if (remainingSeconds > 0) {
-        return `${hours}h ${minutes}m ${remainingSeconds}s`;
-      }
-      return `${hours}h ${minutes}m`;
-    }
+  //   if (hours > 0) {
+  //     if (remainingSeconds > 0) {
+  //       return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  //     }
+  //     return `${hours}h ${minutes}m`;
+  //   }
 
-    if (remainingSeconds > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
+  //   if (remainingSeconds > 0) {
+  //     return `${minutes}m ${remainingSeconds}s`;
+  //   }
 
-    return `${minutes}m`;
-  }
+  //   return `${minutes}m`;
+  // }
 
 
 
@@ -1121,11 +1220,10 @@ class TaskManager {
         <div class="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span class="font-medium text-gray-700 dark:text-zinc-300">Status:</span>
-            <span class="ml-2 px-2 py-1 rounded text-xs ${
-              task.status === 'progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-              task.status === 'done' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-            }">
+            <span class="ml-2 px-2 py-1 rounded text-xs ${task.status === 'progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+        task.status === 'done' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+          'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+      }">
               ${task.status === 'progress' ? 'Em Progresso' : task.status === 'done' ? 'Concluído' : 'Backlog'}
             </span>
           </div>
@@ -1224,6 +1322,51 @@ class TaskManager {
     localStorage.setItem('deepnote-timer-states', JSON.stringify(timerStates));
   }
 
+  // restoreTimerStates() {
+  //   try {
+  //     const savedStates = localStorage.getItem('deepnote-timer-states');
+  //     if (!savedStates) return;
+
+  //     const timerStates = JSON.parse(savedStates);
+  //     const now = Date.now();
+
+  //     Object.entries(timerStates).forEach(([taskId, state]) => {
+  //       if (state.isRunning && state.startTime && state.noteId) {
+  //         // Calculate elapsed time since last save
+  //         const elapsedSinceStart = Math.floor((now - state.startTime) / 1000);
+  //         const totalWorkedTime = state.workedTime + elapsedSinceStart;
+
+  //         // Update task with accumulated time
+  //         window.storageAPI.updateNoteTaskTimer(state.noteId, taskId, {
+  //           isRunning: true,
+  //           currentSessionStart: now, // Reset start time to now
+  //           workedTime: totalWorkedTime,
+  //           totalWorkedTime: totalWorkedTime,
+  //           lastUpdate: now
+  //         });
+
+  //         // Restart the timer if this note is currently active
+  //         if (this.currentNoteId === state.noteId) {
+  //           const interval = setInterval(() => {
+  //             this.updateTimerDisplay(taskId);
+  //           }, 1000);
+
+  //           this.activeTimers.set(taskId, interval);
+  //         }
+  //       }
+  //     });
+
+  //     // Clear saved states
+  //     localStorage.removeItem('deepnote-timer-states');
+
+  //     if (Object.keys(timerStates).length > 0) {
+  //       this.showNotification('Timers restaurados da sessão anterior');
+  //     }
+  //   } catch (error) {
+  //     console.error('Error restoring timer states:', error);
+  //   }
+  // }
+
   restoreTimerStates() {
     try {
       const savedStates = localStorage.getItem('deepnote-timer-states');
@@ -1249,11 +1392,37 @@ class TaskManager {
 
           // Restart the timer if this note is currently active
           if (this.currentNoteId === state.noteId) {
-            const interval = setInterval(() => {
-              this.updateTimerDisplay(taskId);
-            }, 1000);
+            // ✅ Get task data to restore timer properly
+            const tasks = window.storageAPI.getNoteTasks(state.noteId);
+            const task = tasks.find(t => t.id === taskId);
 
-            this.activeTimers.set(taskId, interval);
+            if (task) {
+              const baseWorkedTime = totalWorkedTime;
+              const estimatedTime = task.estimatedTime || 0;
+
+              // ✅ Use mesma lógica do startTimer
+              const interval = setInterval(() => {
+                const elapsedInSession = Math.floor((Date.now() - now) / 1000);
+                const currentTotalTime = baseWorkedTime + elapsedInSession;
+
+                const taskCard = document.querySelector(`[data-task-id="${taskId}"]`);
+                if (taskCard) {
+                  const timeDisplay = taskCard.querySelector('.flex.items-center.gap-2 span');
+                  const progressBar = taskCard.querySelector('.bg-blue-500');
+
+                  if (timeDisplay) {
+                    timeDisplay.textContent = `${this.formatTime(currentTotalTime)} / ${this.formatTime(estimatedTime)}`;
+                  }
+
+                  if (progressBar) {
+                    const progress = estimatedTime > 0 ? Math.min((currentTotalTime / estimatedTime) * 100, 100) : 0;
+                    progressBar.style.width = `${progress}%`;
+                  }
+                }
+              }, 1000);
+
+              this.activeTimers.set(taskId, interval);
+            }
           }
         }
       });

@@ -10,35 +10,158 @@ let isAutoSaveEnabled = true;
 let saveTimeout;
 let lastSavedContent = '';
 let lastSavedTitle = '';
+let isSidebarOpen = false;
+let currentViewportWidth = window.innerWidth;
 
-const notesList = document.querySelector("#notes-list");
-const noteContent = document.querySelector("#note-content");
-const noteTitle = document.querySelector("#note-title");
-const noteHeader = document.querySelector("#note-header");
-const newNoteBtn = document.querySelector("#new-note-btn");
-const saveNoteBtn = document.querySelector("#save-note-btn");
-const deleteNoteBtn = document.querySelector("#delete-note-btn");
-const timerDisplay = document.querySelector("#timer-display");
-const startTimerBtn = document.querySelector("#start-timer");
-const welcomeMessage = document.querySelector("#welcome-message");
-const trashBtn = document.querySelector("#trash-btn");
-const timerProgress = document.querySelector("#timer-progress");
-const timerFill = document.querySelector("#timer-fill");
-const themeToggle = document.querySelector("#theme-toggle");
-const themeToggleDarkIcon = document.querySelector("#theme-toggle-dark-icon");
-const themeToggleLightIcon = document.querySelector("#theme-toggle-light-icon");
-const autoSaveToggle = document.querySelector("#auto-save-toggle");
-const autoSaveCheckbox = document.querySelector("#auto-save-checkbox");
-const toggleBg = document.querySelector("#toggle-bg");
-const toggleSlider = document.querySelector("#toggle-slider");
-const saveStatus = document.querySelector("#save-status");
-const saveStatusIcon = document.querySelector("#save-status-icon");
-const saveStatusText = document.querySelector("#save-status-text");
-const noteOptionsBtn = document.querySelector("#note-options-btn");
-const noteOptionsMenu = document.querySelector("#note-options-menu");
+// DOM elements - will be initialized when DOM is ready
+let notesList, noteContent, noteTitle, noteHeader;
+let newNoteBtn, saveNoteBtn, deleteNoteBtn, timerDisplay, startTimerBtn;
+let welcomeMessage, trashBtn, timerProgress, timerFill;
+let themeToggle, themeToggleDarkIcon, themeToggleLightIcon;
+let autoSaveToggle, autoSaveCheckbox, toggleBg, toggleSlider;
+let saveStatus, saveStatusIcon, saveStatusText;
+let noteOptionsBtn, noteOptionsMenu, sidebarToggle, sidebar, mainContent;
+
+// ===== NOVO EDITOR DE DOCUMENTO =====
+let documentEditor = null;
+
+// Initialize DOM elements
+function initDOMElements() {
+  // Core elements
+  notesList = document.querySelector("#notes-list");
+  noteContent = document.querySelector("#note-content");
+  noteTitle = document.querySelector("#note-title");
+  noteHeader = document.querySelector("#note-header");
+  newNoteBtn = document.querySelector("#new-note-btn");
+  saveNoteBtn = document.querySelector("#save-note-btn");
+  deleteNoteBtn = document.querySelector("#delete-note-btn");
+  timerDisplay = document.querySelector("#timer-display");
+  startTimerBtn = document.querySelector("#start-timer");
+  welcomeMessage = document.querySelector("#welcome-message");
+  trashBtn = document.querySelector("#trash-btn");
+  timerProgress = document.querySelector("#timer-progress");
+  timerFill = document.querySelector("#timer-fill");
+
+  // Theme elements
+  themeToggle = document.querySelector("#theme-toggle");
+  themeToggleDarkIcon = document.querySelector("#theme-toggle-dark-icon");
+  themeToggleLightIcon = document.querySelector("#theme-toggle-light-icon");
+
+  // Auto-save elements
+  autoSaveToggle = document.querySelector("#auto-save-toggle");
+  autoSaveCheckbox = document.querySelector("#auto-save-checkbox");
+  toggleBg = document.querySelector("#toggle-bg");
+  toggleSlider = document.querySelector("#toggle-slider");
+
+  // Status elements
+  saveStatus = document.querySelector("#save-status");
+  saveStatusIcon = document.querySelector("#save-status-icon");
+  saveStatusText = document.querySelector("#save-status-text");
+
+  // Menu and layout elements
+  noteOptionsBtn = document.querySelector("#note-options-btn");
+  noteOptionsMenu = document.querySelector("#note-options-menu");
+  sidebarToggle = document.querySelector("#sidebar-toggle");
+  sidebar = document.querySelector("#sidebar");
+  mainContent = document.querySelector("#main-content");
+
+
+}
+
+// Initialize document editor when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize DOM elements first
+  initDOMElements();
+
+  if (window.DocumentEditor) {
+    documentEditor = new DocumentEditor();
+  }
+});
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// ===== RESPONSIVE LAYOUT FUNCTIONS =====
+
+function toggleSidebar() {
+  if (window.innerWidth <= 768) {
+    isSidebarOpen = !isSidebarOpen;
+    sidebar.classList.toggle('open', isSidebarOpen);
+
+    // Update toggle button icon
+    const icon = sidebarToggle.querySelector('svg path');
+    if (isSidebarOpen) {
+      icon.setAttribute('d', 'M6 18L18 6M6 6l12 12'); // X icon
+    } else {
+      icon.setAttribute('d', 'M4 6h16M4 12h16M4 18h16'); // Hamburger icon
+    }
+  }
+}
+
+function handleViewportChange() {
+  const newWidth = window.innerWidth;
+
+  // If switching from mobile to desktop, ensure sidebar is visible
+  if (currentViewportWidth <= 768 && newWidth > 768) {
+    sidebar.classList.remove('open');
+    isSidebarOpen = false;
+  }
+
+  // If switching from desktop to mobile, hide sidebar
+  if (currentViewportWidth > 768 && newWidth <= 768) {
+    sidebar.classList.remove('open');
+    isSidebarOpen = false;
+  }
+
+  currentViewportWidth = newWidth;
+  updateLayoutClasses();
+}
+
+function updateLayoutClasses() {
+  const width = window.innerWidth;
+
+  // Remove all responsive classes
+  document.body.classList.remove('mobile-layout', 'tablet-layout', 'desktop-layout', 'wide-layout', 'ultra-wide-layout');
+
+  // Add appropriate class based on viewport
+  if (width <= 768) {
+    document.body.classList.add('mobile-layout');
+  } else if (width <= 1024) {
+    document.body.classList.add('tablet-layout');
+  } else if (width <= 1440) {
+    document.body.classList.add('desktop-layout');
+  } else if (width <= 2560) {
+    document.body.classList.add('wide-layout');
+  } else {
+    document.body.classList.add('ultra-wide-layout');
+  }
+}
+
+function initResponsiveLayout() {
+  // Set initial layout
+  updateLayoutClasses();
+
+  // Add event listeners
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', toggleSidebar);
+  }
+
+  // Handle window resize with debouncing
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(handleViewportChange, 150);
+  });
+
+  // Handle clicks outside sidebar on mobile
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && isSidebarOpen) {
+      if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+        toggleSidebar();
+      }
+    }
+  });
 }
 
 // Funções de gerenciamento de tema
@@ -69,6 +192,10 @@ function updateTheme() {
 }
 
 function updateThemeIcons() {
+  if (!themeToggleDarkIcon || !themeToggleLightIcon) {
+    return;
+  }
+
   if (isDarkMode) {
     themeToggleDarkIcon.classList.add('hidden');
     themeToggleLightIcon.classList.remove('hidden');
@@ -94,6 +221,8 @@ function toggleAutoSave() {
 }
 
 function updateAutoSaveUI() {
+  if (!toggleBg || !toggleSlider || !autoSaveCheckbox) return;
+
   if (isAutoSaveEnabled) {
     // Estado ativo - azul com slider à direita
     toggleBg.className = 'w-8 h-4 bg-blue-500 rounded-full shadow-inner transition-colors duration-200';
@@ -108,6 +237,8 @@ function updateAutoSaveUI() {
 }
 
 function updateSaveStatus(status, message = '') {
+  if (!saveStatusText || !saveStatusIcon) return;
+
   const statusMap = {
     'saved': { text: 'Salvo', icon: true, color: 'text-green-500' },
     'saving': { text: 'Salvando...', icon: false, color: 'text-blue-500' },
@@ -136,28 +267,29 @@ function hasUnsavedChanges() {
   return currentTitle !== lastSavedTitle || currentContent !== lastSavedContent;
 }
 
-function renderNotes() {
+async function renderNotes() {
   if (!window.storageAPI) {
     console.error('StorageAPI not available');
     return;
   }
 
-  const items = isTrashView ? window.storageAPI.getTrash() : window.storageAPI.getNotes();
-  notesList.innerHTML = "";
+  try {
+    const items = isTrashView ? await window.storageAPI.getTrash() : await window.storageAPI.getNotes();
+    notesList.innerHTML = "";
 
-  // Atualizar título da seção
-  const sectionTitle = document.querySelector('.notes-section-title');
-  if (sectionTitle) {
-    sectionTitle.textContent = isTrashView ? 'Lixeira' : 'Suas Notas';
-  }
+    // Atualizar título da seção
+    const sectionTitle = document.querySelector('.notes-section-title');
+    if (sectionTitle) {
+      sectionTitle.textContent = isTrashView ? 'Lixeira' : 'Suas Notas';
+    }
 
-  if (items.length === 0) {
-    const emptyDiv = document.createElement("div");
-    emptyDiv.className = "text-gray-500 dark:text-zinc-500 text-sm p-3 text-center bg-gray-50 dark:bg-zinc-800 rounded-md border border-gray-200 dark:border-zinc-700";
-    emptyDiv.textContent = isTrashView ? "Lixeira vazia" : "Nenhuma nota criada";
-    notesList.appendChild(emptyDiv);
-    return;
-  }
+    if (items.length === 0) {
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "text-gray-500 dark:text-zinc-500 text-sm p-3 text-center bg-gray-50 dark:bg-zinc-800 rounded-md border border-gray-200 dark:border-zinc-700";
+      emptyDiv.textContent = isTrashView ? "Lixeira vazia" : "Nenhuma nota criada";
+      notesList.appendChild(emptyDiv);
+      return;
+    }
 
   items.sort((a, b) => (b.updated || b.created) - (a.updated || a.created));
 
@@ -217,35 +349,63 @@ function renderNotes() {
     }
     notesList.appendChild(div);
   });
+  } catch (error) {
+    console.error('Error rendering notes:', error);
+    notesList.innerHTML = "";
+    const errorDiv = document.createElement("div");
+    errorDiv.className = "text-red-500 dark:text-red-400 text-sm p-3 text-center bg-red-50 dark:bg-red-900/20 rounded-md border border-red-200 dark:border-red-800";
+    errorDiv.textContent = "Erro ao carregar notas";
+    notesList.appendChild(errorDiv);
+  }
 }
 
-function loadNote(noteId) {
+async function loadNote(noteId) {
   if (!window.storageAPI) {
     console.error('StorageAPI not available');
     return;
   }
 
-  const notes = window.storageAPI.getNotes();
-  const note = notes.find(n => n.id === noteId);
+  try {
+    const notes = await window.storageAPI.getNotes();
+    const note = notes.find(n => n.id === noteId);
 
-  if (note) {
-    currentNoteId = noteId;
-    noteTitle.value = note.title || "";
-    noteContent.value = note.content || "";
-    lastSavedTitle = note.title || "";
-    lastSavedContent = note.content || "";
-    showEditor();
-    renderNotes();
-    updateSaveStatus(isAutoSaveEnabled ? 'auto' : 'manual');
+    if (note) {
+      // Use new document editor if available
+      if (documentEditor) {
+        documentEditor.showEditor(noteId, note);
+        renderNotes(); // Update sidebar selection
+        return;
+      }
 
-    // Initialize tasks for this note
-    if (window.taskManager) {
-      window.taskManager.initializeTasksForNote(noteId);
+      // Fallback to legacy editor
+      currentNoteId = noteId;
+      noteTitle.value = note.title || "";
+      noteContent.value = note.content || "";
+      lastSavedTitle = note.title || "";
+      lastSavedContent = note.content || "";
+      showEditor();
+      renderNotes();
+      updateSaveStatus(isAutoSaveEnabled ? 'auto' : 'manual');
+
+      // Initialize tasks for this note
+      if (window.taskManager) {
+        window.taskManager.initializeTasksForNote(noteId);
+      }
     }
+  } catch (error) {
+    console.error('Error loading note:', error);
+    updateSaveStatus('error', 'Erro ao carregar nota');
   }
 }
 
 function createNewNote() {
+  // Use new document editor if available
+  if (documentEditor) {
+    documentEditor.showEditor();
+    return;
+  }
+
+  // Fallback to legacy editor
   currentNoteId = null;
   noteTitle.value = "";
   noteContent.value = "";
@@ -262,7 +422,7 @@ function createNewNote() {
   }
 }
 
-function saveNote(isAutoSave = false) {
+async function saveNote(isAutoSave = false) {
   if (!window.storageAPI) {
     console.error('StorageAPI not available');
     updateSaveStatus('error', 'Sistema indisponível');
@@ -282,13 +442,15 @@ function saveNote(isAutoSave = false) {
     updateSaveStatus('saving');
     // Adicionar efeito visual no botão
     const saveBtn = document.querySelector('#save-note-btn');
-    saveBtn.classList.add('opacity-75', 'cursor-not-allowed');
-    saveBtn.disabled = true;
+    if (saveBtn) {
+      saveBtn.classList.add('opacity-75', 'cursor-not-allowed');
+      saveBtn.disabled = true;
+    }
   }
 
   try {
     if (currentNoteId) {
-      window.storageAPI.updateNote(currentNoteId, {
+      await window.storageAPI.updateNote(currentNoteId, {
         title: title,
         content: content,
         updated: Date.now()
@@ -301,7 +463,7 @@ function saveNote(isAutoSave = false) {
         created: Date.now(),
         updated: Date.now()
       };
-      window.storageAPI.saveNote(newNote);
+      await window.storageAPI.saveNote(newNote);
       currentNoteId = newNote.id;
     }
 
@@ -326,8 +488,10 @@ function saveNote(isAutoSave = false) {
       // Restaurar botão
       setTimeout(() => {
         const saveBtn = document.querySelector('#save-note-btn');
-        saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-        saveBtn.disabled = false;
+        if (saveBtn) {
+          saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+          saveBtn.disabled = false;
+        }
 
         if (isAutoSaveEnabled) {
           updateSaveStatus('auto');
@@ -336,13 +500,15 @@ function saveNote(isAutoSave = false) {
     }
   } catch (error) {
     console.error('Error saving note:', error);
-    updateSaveStatus('error');
+    updateSaveStatus('error', 'Erro ao salvar');
 
     // Restaurar botão em caso de erro
     if (!isAutoSave) {
       const saveBtn = document.querySelector('#save-note-btn');
-      saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
-      saveBtn.disabled = false;
+      if (saveBtn) {
+        saveBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+        saveBtn.disabled = false;
+      }
     }
   }
 }
@@ -363,21 +529,26 @@ function showSaveIndicator() {
   }, 3000);
 }
 
-function deleteNote() {
+async function deleteNote() {
   if (!window.storageAPI) {
     console.error('StorageAPI not available');
     return;
   }
 
   if (currentNoteId && confirm("Tem certeza que deseja deletar esta nota?")) {
-    // Clean up any active timers for tasks in this note
-    if (window.taskManager) {
-      window.taskManager.cleanupNoteTimers(currentNoteId);
-    }
+    try {
+      // Clean up any active timers for tasks in this note
+      if (window.taskManager) {
+        window.taskManager.cleanupNoteTimers(currentNoteId);
+      }
 
-    window.storageAPI.deleteNote(currentNoteId);
-    clearEditor();
-    renderNotes();
+      await window.storageAPI.deleteNote(currentNoteId);
+      clearEditor();
+      renderNotes();
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      updateSaveStatus('error', 'Erro ao deletar nota');
+    }
   }
 }
 
@@ -389,6 +560,8 @@ function clearEditor() {
 }
 
 function showEditor() {
+  if (!noteHeader || !noteContent || !welcomeMessage) return;
+
   noteHeader.classList.remove("hidden");
   noteContent.classList.remove("hidden");
   welcomeMessage.classList.add("hidden");
@@ -412,6 +585,8 @@ function showEditor() {
 }
 
 function hideEditor() {
+  if (!noteHeader || !noteContent || !welcomeMessage) return;
+
   noteHeader.classList.add("hidden");
   noteContent.classList.add("hidden");
   welcomeMessage.classList.remove("hidden");
@@ -587,7 +762,9 @@ function permanentlyDeleteNote(id) {
 
 // Funções do menu de opções
 function toggleOptionsMenu() {
-  noteOptionsMenu.classList.toggle('hidden');
+  if (noteOptionsMenu) {
+    noteOptionsMenu.classList.toggle('hidden');
+  }
 }
 
 function duplicateNote() {
@@ -607,7 +784,9 @@ function duplicateNote() {
   window.storageAPI.saveNote(duplicatedNote);
   renderNotes();
   showNotification('Nota duplicada com sucesso!');
-  noteOptionsMenu.classList.add('hidden');
+  if (noteOptionsMenu) {
+    noteOptionsMenu.classList.add('hidden');
+  }
 }
 
 function exportNote() {
@@ -627,7 +806,9 @@ function exportNote() {
   URL.revokeObjectURL(url);
 
   showNotification('Nota exportada com sucesso!');
-  noteOptionsMenu.classList.add('hidden');
+  if (noteOptionsMenu) {
+    noteOptionsMenu.classList.add('hidden');
+  }
 }
 
 function showNoteInfo() {
@@ -654,21 +835,95 @@ Informações da Nota:
     alert(info);
   }
 
-  noteOptionsMenu.classList.add('hidden');
+  if (noteOptionsMenu) {
+    noteOptionsMenu.classList.add('hidden');
+  }
 }
 
-newNoteBtn.onclick = createNewNote;
-saveNoteBtn.onclick = () => saveNote(false);
-deleteNoteBtn.onclick = deleteNote;
-startTimerBtn.onclick = startTimer;
-trashBtn.onclick = toggleTrashView;
-themeToggle.onclick = toggleTheme;
-autoSaveToggle.onclick = toggleAutoSave;
-noteOptionsBtn.onclick = toggleOptionsMenu;
+// Setup event listeners
+function setupEventListeners() {
+  if (newNoteBtn) newNoteBtn.onclick = createNewNote;
+  if (saveNoteBtn) saveNoteBtn.onclick = () => saveNote(false);
+  if (deleteNoteBtn) deleteNoteBtn.onclick = deleteNote;
+  if (startTimerBtn) startTimerBtn.onclick = startTimer;
+  if (trashBtn) trashBtn.onclick = toggleTrashView;
+  if (themeToggle) themeToggle.onclick = toggleTheme;
+  if (autoSaveToggle) autoSaveToggle.onclick = toggleAutoSave;
+  if (noteOptionsBtn) noteOptionsBtn.onclick = toggleOptionsMenu;
+
+  // Auto-save event listeners
+  if (noteContent) noteContent.addEventListener("input", autoSave);
+  if (noteTitle) noteTitle.addEventListener("input", autoSave);
+
+  // Menu options event listeners
+  if (noteOptionsMenu) {
+    noteOptionsMenu.addEventListener('click', (e) => {
+      const button = e.target.closest('button');
+      if (!button) return;
+
+      const text = button.textContent.trim();
+      if (text.includes('Duplicar')) {
+        duplicateNote();
+      } else if (text.includes('Exportar')) {
+        exportNote();
+      } else if (text.includes('Informações')) {
+        showNoteInfo();
+      }
+    });
+  }
+
+  // Click outside menu to close
+  document.addEventListener('click', (e) => {
+    if (noteOptionsBtn && noteOptionsMenu &&
+        !noteOptionsBtn.contains(e.target) &&
+        !noteOptionsMenu.contains(e.target)) {
+      noteOptionsMenu.classList.add('hidden');
+    }
+  });
+
+  // Toggle note field buttons
+  const toggleNoteBtn = document.querySelector('#toggle-note-content');
+  const expandNoteBtn = document.querySelector('#expand-note-content');
+
+  if (toggleNoteBtn) {
+    toggleNoteBtn.onclick = collapseNoteField;
+  }
+
+  if (expandNoteBtn) {
+    expandNoteBtn.onclick = expandNoteField;
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key === "n") {
+      e.preventDefault();
+      createNewNote();
+    }
+    if (e.ctrlKey && e.key === "s") {
+      e.preventDefault();
+      saveNote();
+    }
+    // Toggle sidebar with Ctrl+B (mobile only)
+    if (e.ctrlKey && e.key === "b") {
+      e.preventDefault();
+      if (window.innerWidth <= 768) {
+        toggleSidebar();
+      }
+    }
+  });
+}
+
+// Flag to prevent multiple auto-save operations
+let isAutoSaving = false;
 
 function autoSave() {
   if (!isAutoSaveEnabled) {
     updateSaveStatus('manual');
+    return;
+  }
+
+  // Prevent multiple auto-save operations
+  if (isAutoSaving) {
     return;
   }
 
@@ -678,16 +933,22 @@ function autoSave() {
   if (hasUnsavedChanges()) {
     updateSaveStatus('draft');
 
-    saveTimeout = setTimeout(() => {
+    saveTimeout = setTimeout(async () => {
       if (currentNoteId || noteTitle.value.trim() || noteContent.value.trim()) {
-        saveNote(true); // true indica que é auto-save
+        isAutoSaving = true;
+        try {
+          await saveNote(true); // true indica que é auto-save
+        } catch (error) {
+          console.error('Auto-save failed:', error);
+        } finally {
+          isAutoSaving = false;
+        }
       }
     }, 2000); // Aumentado para 2 segundos para melhor UX
   }
 }
 
-noteContent.addEventListener("input", autoSave);
-noteTitle.addEventListener("input", autoSave);
+// Auto-save event listeners moved to setupEventListeners()
 
 // ===== FUNCIONALIDADE DE EXPANSÃO/COLAPSO DO CAMPO DA NOTA =====
 
@@ -730,57 +991,25 @@ function expandNoteField() {
   isNoteFieldCollapsed = false;
 }
 
-// Event listeners para os botões de toggle do campo da nota
-document.addEventListener('DOMContentLoaded', () => {
-  const toggleNoteBtn = document.querySelector('#toggle-note-content');
-  const expandNoteBtn = document.querySelector('#expand-note-content');
+// Toggle note field event listeners moved to setupEventListeners()
 
-  if (toggleNoteBtn) {
-    toggleNoteBtn.onclick = collapseNoteField;
-  }
+// Event listeners moved to setupEventListeners() function
 
-  if (expandNoteBtn) {
-    expandNoteBtn.onclick = expandNoteField;
-  }
-});
-
-// Event listeners para o menu de opções
-document.addEventListener('click', (e) => {
-  if (!noteOptionsBtn.contains(e.target) && !noteOptionsMenu.contains(e.target)) {
-    noteOptionsMenu.classList.add('hidden');
-  }
-});
-
-// Event listeners para as opções do menu
-noteOptionsMenu.addEventListener('click', (e) => {
-  const button = e.target.closest('button');
-  if (!button) return;
-
-  const text = button.textContent.trim();
-  if (text.includes('Duplicar')) {
-    duplicateNote();
-  } else if (text.includes('Exportar')) {
-    exportNote();
-  } else if (text.includes('Informações')) {
-    showNoteInfo();
-  }
-});
-
-document.addEventListener("keydown", (e) => {
-  if (e.ctrlKey && e.key === "n") {
-    e.preventDefault();
-    createNewNote();
-  }
-  if (e.ctrlKey && e.key === "s") {
-    e.preventDefault();
-    saveNote();
-  }
-});
+// Keyboard shortcuts moved to setupEventListeners() function
 
 // Inicializar aplicação
 function initApp() {
+  // Inicializar elementos DOM
+  initDOMElements();
+
+  // Setup event listeners
+  setupEventListeners();
+
   // Inicializar tema
   initTheme();
+
+  // Inicializar sistema responsivo
+  initResponsiveLayout();
 
   // Inicializar auto-save
   const savedAutoSave = localStorage.getItem('autoSaveEnabled');
@@ -793,27 +1022,33 @@ function initApp() {
   updateSaveStatus('draft');
 
   if (window.storageAPI) {
-    renderNotes();
+    renderNotes().catch(error => {
+      console.error('Failed to render notes on init:', error);
+    });
   } else {
     console.error('StorageAPI not available - check preload script');
     setTimeout(() => {
       if (window.storageAPI) {
-        renderNotes();
+        renderNotes().catch(error => {
+          console.error('Failed to render notes after retry:', error);
+        });
       } else {
         const errorDiv = document.createElement("div");
         errorDiv.className = "text-red-500 dark:text-red-400 text-sm p-2";
         errorDiv.textContent = "Erro: Sistema de armazenamento não disponível";
-        notesList.appendChild(errorDiv);
+        if (notesList) {
+          notesList.appendChild(errorDiv);
+        }
       }
     }, 100);
   }
 }
 
-// Inicializar quando a página carregar
-initApp();
-
 // Make taskManager globally available for integration
 window.addEventListener('DOMContentLoaded', () => {
+  // Initialize app when DOM is ready
+  initApp();
+
   // Wait for taskManager to be initialized
   setTimeout(() => {
     if (window.taskManager) {
